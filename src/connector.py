@@ -8,7 +8,7 @@ import mysql.connector
 
 
 def timeout_handler(signum, frame):
-    raise Exception("Query timed out")
+    raise TimeoutError("Query timed out")
 
 
 class MySQLConnector:
