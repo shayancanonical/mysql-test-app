@@ -26,6 +26,7 @@ DATABASE_NAME = "continuous_writes_database"
 PEER = "application-peers"
 PROC_PID_KEY = "proc-pid"
 TABLE_NAME = "data"
+DATABASE_RELATION = "database"
 
 
 class ContinuousWritesApplication(CharmBase):
@@ -51,6 +52,9 @@ class ContinuousWritesApplication(CharmBase):
         self.database = DatabaseRequires(self, "database", DATABASE_NAME)
         self.framework.observe(self.database.on.database_created, self._on_database_created)
         self.framework.observe(self.database.on.endpoints_changed, self._on_endpoints_changed)
+        self.framework.observe(
+            self.charm.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
+        )
 
     # ==============
     # Properties
@@ -134,6 +138,7 @@ class ContinuousWritesApplication(CharmBase):
 
         del self.app_peer_data[PROC_PID_KEY]
 
+        last_written_value = -1
         # Query and return the max value inserted in the database
         # (else -1 if unable to query)
         try:
@@ -142,12 +147,10 @@ class ContinuousWritesApplication(CharmBase):
                     last_written_value = self._max_written_value()
         except RetryError as e:
             logger.exception("Unable to query the database", exc_info=e)
-            return -1
-
         return last_written_value
 
     def _max_written_value(self) -> int:
-        """Returns the count of rows in the continuous writes table."""
+        """Return the count of rows in the continuous writes table."""
         if not self._database_config:
             return -1
 
@@ -158,9 +161,9 @@ class ContinuousWritesApplication(CharmBase):
     # ==============
     # Handlers
     # ==============
-
     def _on_start(self, _) -> None:
         """Handle the start event."""
+        self.unit.set_workload_version("0.0.1")
         self.unit.status = WaitingStatus()
 
     def _on_clear_continuous_writes_action(self, _) -> None:
@@ -196,6 +199,10 @@ class ContinuousWritesApplication(CharmBase):
         """Handle the database endpoints changed event."""
         count = self._max_written_value()
         self._start_continuous_writes(count + 1)
+
+    def _on_relation_broken(self, _) -> None:
+        """Handle the database relation broken event."""
+        self.unit.status = WaitingStatus()
 
 
 if __name__ == "__main__":

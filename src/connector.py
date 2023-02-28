@@ -2,12 +2,16 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""MySQL opinionated context manager."""
+
 import signal
 
 import mysql.connector
 
 
 def timeout_handler(signum, frame):
+    """Handle the timeout signal."""
+    del signum, frame
     raise TimeoutError("Query timed out")
 
 
@@ -43,6 +47,7 @@ class MySQLConnector:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Handle transaction and connection close."""
+        del exc_val, exc_tb
         if self.commit and exc_type is None:
             self.connection.commit()
         self.cursor.close()

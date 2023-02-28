@@ -51,6 +51,7 @@ def continuous_writes(database_config: Dict, table_name: str, starting_number: i
 
 
 def main():
+    """Run the continuous writes script."""
     [_, username, password, host, port, database, table_name, starting_number] = sys.argv
     database_config = {
         "user": username,
