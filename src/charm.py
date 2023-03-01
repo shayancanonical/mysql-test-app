@@ -53,7 +53,7 @@ class ContinuousWritesApplication(CharmBase):
         self.framework.observe(self.database.on.database_created, self._on_database_created)
         self.framework.observe(self.database.on.endpoints_changed, self._on_endpoints_changed)
         self.framework.observe(
-            self.charm.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
+            self.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
         )
 
     # ==============
