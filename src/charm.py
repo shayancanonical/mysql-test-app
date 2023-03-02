@@ -80,6 +80,14 @@ class MySQLTestApplication(CharmBase):
         return self._peers.data[self.app]
 
     @property
+    def unit_peer_data(self) -> Dict:
+        """Application peer relation data object."""
+        if self._peers is None:
+            return {}
+
+        return self._peers.data[self.unit]
+
+    @property
     def _database_config(self):
         """Returns the database config to use to connect to the MySQL cluster."""
         data = list(self.database.fetch_relation_data().values())[0]
@@ -128,7 +136,7 @@ class MySQLTestApplication(CharmBase):
         )
 
         # Store the continuous writes process id in stored state to be able to stop it later
-        self.app_peer_data[PROC_PID_KEY] = str(proc.pid)
+        self.unit_peer_data[PROC_PID_KEY] = str(proc.pid)
         logger.info("Started continuous writes")
 
     def _stop_continuous_writes(self) -> Optional[int]:
@@ -136,14 +144,14 @@ class MySQLTestApplication(CharmBase):
         if not self._database_config:
             return None
 
-        if not self.app_peer_data.get(PROC_PID_KEY):
+        if not self.unit_peer_data.get(PROC_PID_KEY):
             return None
 
         # Send a SIGKILL to the process and wait for the process to exit
         proc = subprocess.Popen(["pkill", "--signal", "SIGKILL", "-f", "src/continuous_writes.py"])
         proc.communicate()
 
-        del self.app_peer_data[PROC_PID_KEY]
+        del self.unit_peer_data[PROC_PID_KEY]
 
         last_written_value = -1
         # Query and return the max value inserted in the database
@@ -242,7 +250,8 @@ class MySQLTestApplication(CharmBase):
         """Handle the database created event."""
         self._start_continuous_writes(1)
         value = self._write_random_value()
-        self.app_peer_data[RANDOM_VALUE_KEY] = value
+        if self.unit.is_leader():
+            self.app_peer_data[RANDOM_VALUE_KEY] = value
         self.unit.status = ActiveStatus()
 
     def _on_endpoints_changed(self, _) -> None:
