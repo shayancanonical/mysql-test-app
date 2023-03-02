@@ -189,9 +189,7 @@ class MySQLTestApplication(CharmBase):
 
     def _insert_test_data(self, cursor, random_value: str) -> None:
         """Insert the provided random value into the test table in the database."""
-        cursor.execute(
-            f"INSERT INTO `{RANDOM_VALUE_TABLE_NAME}`(data) VALUES('{random_value}')"
-        )
+        cursor.execute(f"INSERT INTO `{RANDOM_VALUE_TABLE_NAME}`(data) VALUES('{random_value}')")
 
     @staticmethod
     def _generate_random_values(length) -> str:
