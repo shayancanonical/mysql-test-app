@@ -9,6 +9,8 @@ high availability of the MySQL charm.
 """
 
 import logging
+import secrets
+import string
 import subprocess
 from typing import Dict, Optional
 
@@ -22,14 +24,16 @@ from connector import MySQLConnector  # isort: skip
 
 logger = logging.getLogger(__name__)
 
+CONTINUOUS_WRITE_TABLE_NAME = "data"
 DATABASE_NAME = "continuous_writes_database"
+DATABASE_RELATION = "database"
 PEER = "application-peers"
 PROC_PID_KEY = "proc-pid"
-TABLE_NAME = "data"
-DATABASE_RELATION = "database"
+RANDOM_VALUE_KEY = "inserted_value"
+RANDOM_VALUE_TABLE_NAME = "random_data"
 
 
-class ContinuousWritesApplication(CharmBase):
+class MySQLTestApplication(CharmBase):
     """Application charm that continuously writes to MySQL."""
 
     def __init__(self, *args):
@@ -47,6 +51,8 @@ class ContinuousWritesApplication(CharmBase):
         self.framework.observe(
             self.on.stop_continuous_writes_action, self._on_stop_continuous_writes_action
         )
+
+        self.framework.observe(self.on.get_inserted_data_action, self._get_inserted_data)
 
         # Database related events
         self.database = DatabaseRequires(self, "database", DATABASE_NAME)
@@ -116,7 +122,7 @@ class ContinuousWritesApplication(CharmBase):
                 self._database_config["host"],
                 self._database_config["port"],
                 self._database_config["database"],
-                TABLE_NAME,
+                CONTINUOUS_WRITE_TABLE_NAME,
                 str(starting_number),
             ]
         )
@@ -155,8 +161,44 @@ class ContinuousWritesApplication(CharmBase):
             return -1
 
         with MySQLConnector(self._database_config) as cursor:
-            cursor.execute(f"SELECT MAX(number) FROM `{DATABASE_NAME}`.`{TABLE_NAME}`;")
+            cursor.execute(
+                f"SELECT MAX(number) FROM `{DATABASE_NAME}`.`{CONTINUOUS_WRITE_TABLE_NAME}`;"
+            )
             return cursor.fetchone()[0]
+
+    def _create_test_table(self, cursor) -> None:
+        """Create a test table in the database."""
+        cursor.execute(
+            (
+                f"CREATE TABLE IF NOT EXISTS `{DATABASE_NAME}`.`{RANDOM_VALUE_TABLE_NAME}`("
+                "id SMALLINT NOT NULL AUTO_INCREMENT, "
+                "data VARCHAR(255), "
+                "PRIMARY KEY (id))"
+            )
+        )
+
+    def _insert_test_data(self, cursor, random_value: str) -> None:
+        """Insert the provided random value into the test table in the database."""
+        cursor.execute(
+            f"INSERT INTO `{DATABASE_NAME}`.`{RANDOM_VALUE_TABLE_NAME}`(data) VALUES({random_value})"
+        )
+
+    @staticmethod
+    def _generate_random_values(length) -> str:
+        choices = string.ascii_letters + string.digits
+        return "".join(secrets.choice(choices) for _ in range(length))
+
+    def _write_random_value(self) -> str:
+        """Write a random value to the database."""
+        if not self._database_config:
+            return ""
+
+        with MySQLConnector(self._database_config) as cursor:
+            self._create_test_table(cursor)
+            random_value = self._generate_random_values(10)
+            self._insert_test_data(cursor, random_value)
+
+        return random_value
 
     # ==============
     # Handlers
@@ -173,7 +215,9 @@ class ContinuousWritesApplication(CharmBase):
 
         self._stop_continuous_writes()
         with MySQLConnector(self._database_config) as cursor:
-            cursor.execute(f"DROP TABLE IF EXISTS `{DATABASE_NAME}`.`{TABLE_NAME}`;")
+            cursor.execute(
+                f"DROP TABLE IF EXISTS `{DATABASE_NAME}`.`{CONTINUOUS_WRITE_TABLE_NAME}`;"
+            )
 
     def _on_start_continuous_writes_action(self, _) -> None:
         """Handle the start continuous writes action event."""
@@ -193,6 +237,8 @@ class ContinuousWritesApplication(CharmBase):
     def _on_database_created(self, _) -> None:
         """Handle the database created event."""
         self._start_continuous_writes(1)
+        value = self._write_random_value()
+        self.app_peer_data[RANDOM_VALUE_KEY] = value
         self.unit.status = ActiveStatus()
 
     def _on_endpoints_changed(self, _) -> None:
@@ -204,6 +250,10 @@ class ContinuousWritesApplication(CharmBase):
         """Handle the database relation broken event."""
         self.unit.status = WaitingStatus()
 
+    def _get_inserted_data(self, event: ActionEvent) -> None:
+        """Get random value inserted into the database."""
+        event.set_results({"data": self.app_peer_data.get(RANDOM_VALUE_KEY, "empty")})
+
 
 if __name__ == "__main__":
-    main(ContinuousWritesApplication)
+    main(MySQLTestApplication)
