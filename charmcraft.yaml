@@ -3,10 +3,15 @@
 
 type: charm
 bases:
-    - name: "ubuntu"
-      channel: "20.04"
-    - name: "ubuntu"
-      channel: "22.04"
+  - build-on:
+      - name: "ubuntu"
+        channel: "22.04"
+    run-on:
+      - name: "ubuntu"
+        channel: "22.04"
+      - name: "ubuntu"
+        channel: "20.04"
+
 parts:
   charm:
     charm-binary-python-packages:
