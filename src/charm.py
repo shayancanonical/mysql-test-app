@@ -129,6 +129,7 @@ class MySQLTestApplication(CharmBase):
 
         # Store the continuous writes process id in stored state to be able to stop it later
         self.app_peer_data[PROC_PID_KEY] = str(proc.pid)
+        logger.info("Started continuous writes")
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stop continuous writes to the MySQL cluster and return the last written value."""
@@ -153,6 +154,7 @@ class MySQLTestApplication(CharmBase):
                     last_written_value = self._max_written_value()
         except RetryError as e:
             logger.exception("Unable to query the database", exc_info=e)
+        logger.info("Stop continuous writes")
         return last_written_value
 
     def _max_written_value(self) -> int:
@@ -197,6 +199,8 @@ class MySQLTestApplication(CharmBase):
             self._create_test_table(cursor)
             random_value = self._generate_random_values(10)
             self._insert_test_data(cursor, random_value)
+
+        logger.info("Wrote random_value")
 
         return random_value
 
