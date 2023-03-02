@@ -16,7 +16,6 @@ def continuous_writes(database_config: Dict, table_name: str, starting_number: i
 
     Args:
         database_config: a dictionary with MySQL config to connect to the database
-        database_name: the database name where the table continuously written to exists
         table_name: the table name to direct continuous writes to
         starting_number: number from which to start writing data to the table (and increment from)
     """
