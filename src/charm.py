@@ -172,7 +172,7 @@ class MySQLTestApplication(CharmBase):
         """Create a test table in the database."""
         cursor.execute(
             (
-                f"CREATE TABLE IF NOT EXISTS `{DATABASE_NAME}`.`{RANDOM_VALUE_TABLE_NAME}`("
+                f"CREATE TABLE IF NOT EXISTS `{RANDOM_VALUE_TABLE_NAME}`("
                 "id SMALLINT NOT NULL AUTO_INCREMENT, "
                 "data VARCHAR(255), "
                 "PRIMARY KEY (id))"
@@ -182,7 +182,7 @@ class MySQLTestApplication(CharmBase):
     def _insert_test_data(self, cursor, random_value: str) -> None:
         """Insert the provided random value into the test table in the database."""
         cursor.execute(
-            f"INSERT INTO `{DATABASE_NAME}`.`{RANDOM_VALUE_TABLE_NAME}`(data) VALUES({random_value})"
+            f"INSERT INTO `{RANDOM_VALUE_TABLE_NAME}`(data) VALUES('{random_value}')"
         )
 
     @staticmethod
