@@ -16,7 +16,7 @@ get-inserted-data:
 get-session-ssl-cipher:
   description: Get ssl ciphers.
   params:
-    use_ssl:
+    use-ssl:
       type: string
       enum:
         - "enabled"

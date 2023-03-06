@@ -290,13 +290,25 @@ class MySQLTestApplication(CharmBase):
         event.set_results({"data": self.app_peer_data.get(RANDOM_VALUE_KEY, "empty")})
 
     def _get_session_ssl_cipher(self, event: ActionEvent) -> None:
-        """Get the SSL cipher used by the session."""
-        if not self._database_config:
-            return event.set_results({"cipher": "empty"})
+        """Get the SSL cipher used by the session.
 
-        with MySQLConnector(self._database_config) as cursor:
-            cursor.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'")
-            cipher = cursor.fetchone()[1]
+        This is useful to check that the connection is (un)encrypted.
+        The action has a `use-ssl` parameter that can be used to disable SSL.
+        """
+        if not self._database_config:
+            return event.set_results({"cipher": "noconfig"})
+
+        config = self._database_config.copy()
+        if event.params.get("use-ssl") == "disabled":
+            config["ssl_disabled"] = True
+
+        try:
+            with MySQLConnector(config) as cursor:
+                cursor.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'")
+                cipher = cursor.fetchone()[1]
+        except Exception:
+            logger.exception("Unable to get the SSL cipher")
+            cipher = "error"
 
         event.set_results({"cipher": cipher})
 
