@@ -99,15 +99,20 @@ class MySQLTestApplication(CharmBase):
         if None in [username, password, endpoints]:
             return {}
 
-        [host, port] = endpoints.split(":")
-
-        return {
+        config = {
             "user": username,
             "password": password,
-            "host": host,
-            "port": port,
             "database": DATABASE_NAME,
         }
+        if endpoints.startswith("file://"):
+            config["unix_socket"] = endpoints[7:]
+            config["port"] = "socket"
+        else:
+            host, port = endpoints.split(":")
+            config["host"] = host
+            config["port"] = port
+
+        return config
 
     # ==============
     # Helpers
@@ -127,7 +132,7 @@ class MySQLTestApplication(CharmBase):
                 "src/continuous_writes.py",
                 self._database_config["user"],
                 self._database_config["password"],
-                self._database_config["host"],
+                self._database_config.get("host", self._database_config["unix_socket"]),
                 self._database_config["port"],
                 self._database_config["database"],
                 CONTINUOUS_WRITE_TABLE_NAME,

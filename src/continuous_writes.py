@@ -55,12 +55,15 @@ def main():
     database_config = {
         "user": username,
         "password": password,
-        "host": host,
-        "port": port,
         "database": database,
         "use_pure": True,
         "connection_timeout": 5,
     }
+    if port == "socket":
+        database_config["unix_socket"] = host
+    else:
+        database_config["port"] = port
+        database_config["host"] = host
 
     continuous_writes(database_config, table_name, int(starting_number))
 
