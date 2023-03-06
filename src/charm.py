@@ -205,11 +205,17 @@ class MySQLTestApplication(CharmBase):
         """Write a random value to the database."""
         if not self._database_config:
             return ""
-
-        with MySQLConnector(self._database_config) as cursor:
-            self._create_test_table(cursor)
-            random_value = self._generate_random_values(10)
-            self._insert_test_data(cursor, random_value)
+        random_value = ""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
+                with attempt:
+                    with MySQLConnector(self._database_config) as cursor:
+                        self._create_test_table(cursor)
+                        random_value = self._generate_random_values(10)
+                        self._insert_test_data(cursor, random_value)
+        except RetryError:
+            logger.exception("Unable to write to the database")
+            return random_value
 
         logger.info("Wrote random_value")
 
