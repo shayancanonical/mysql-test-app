@@ -11,4 +11,15 @@ stop-continuous-writes:
   description: Stop continuous writes.
 
 get-inserted-data:
-  description: Get the randomly inserted data in the database by the charm
+  description: Get the randomly inserted data in the database by the charm.
+
+get-session-ssl-cipher:
+  description: Get ssl ciphers.
+  params:
+    use_ssl:
+      type: string
+      enum:
+        - "enabled"
+        - "disabled"
+      description: Use ssl for connection
+      default: enabled

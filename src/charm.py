@@ -43,21 +43,34 @@ class MySQLTestApplication(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
 
         self.framework.observe(
-            self.on.clear_continuous_writes_action, self._on_clear_continuous_writes_action
+            getattr(self.on, "clear_continuous_writes_action"),
+            self._on_clear_continuous_writes_action,
         )
         self.framework.observe(
-            self.on.start_continuous_writes_action, self._on_start_continuous_writes_action
+            getattr(self.on, "start_continuous_writes_action"),
+            self._on_start_continuous_writes_action,
         )
         self.framework.observe(
-            self.on.stop_continuous_writes_action, self._on_stop_continuous_writes_action
+            getattr(self.on, "stop_continuous_writes_action"),
+            self._on_stop_continuous_writes_action,
         )
 
-        self.framework.observe(self.on.get_inserted_data_action, self._get_inserted_data)
+        self.framework.observe(
+            getattr(self.on, "get_inserted_data_action"), self._get_inserted_data
+        )
+
+        self.framework.observe(
+            getattr(self.on, "get_session_ssl_cipher_action"), self._get_session_ssl_cipher
+        )
 
         # Database related events
         self.database = DatabaseRequires(self, "database", DATABASE_NAME)
-        self.framework.observe(self.database.on.database_created, self._on_database_created)
-        self.framework.observe(self.database.on.endpoints_changed, self._on_endpoints_changed)
+        self.framework.observe(
+            getattr(self.database.on, "database_created"), self._on_database_created
+        )
+        self.framework.observe(
+            getattr(self.database.on, "endpoints_changed"), self._on_endpoints_changed
+        )
         self.framework.observe(
             self.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
         )
@@ -275,6 +288,17 @@ class MySQLTestApplication(CharmBase):
     def _get_inserted_data(self, event: ActionEvent) -> None:
         """Get random value inserted into the database."""
         event.set_results({"data": self.app_peer_data.get(RANDOM_VALUE_KEY, "empty")})
+
+    def _get_session_ssl_cipher(self, event: ActionEvent) -> None:
+        """Get the SSL cipher used by the session."""
+        if not self._database_config:
+            return event.set_results({"cipher": "empty"})
+
+        with MySQLConnector(self._database_config) as cursor:
+            cursor.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'")
+            cipher = cursor.fetchone()[1]
+
+        event.set_results({"cipher": cipher})
 
 
 if __name__ == "__main__":
