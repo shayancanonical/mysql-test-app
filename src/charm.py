@@ -104,6 +104,7 @@ class MySQLTestApplication(CharmBase):
     def _database_config(self):
         """Returns the database config to use to connect to the MySQL cluster."""
         data = list(self.database.fetch_relation_data().values())[0]
+
         username, password, endpoints = (
             data.get("username"),
             data.get("password"),
@@ -119,7 +120,6 @@ class MySQLTestApplication(CharmBase):
         }
         if endpoints.startswith("file://"):
             config["unix_socket"] = endpoints[7:]
-            config["port"] = "socket"
         else:
             host, port = endpoints.split(":")
             config["host"] = host
@@ -138,20 +138,24 @@ class MySQLTestApplication(CharmBase):
 
         self._stop_continuous_writes()
 
+        command = [
+            "/usr/bin/python3",
+            "src/continuous_writes.py",
+            self._database_config["user"],
+            self._database_config["password"],
+            self._database_config["database"],
+            CONTINUOUS_WRITE_TABLE_NAME,
+            str(starting_number),
+        ]
+
+        if "unix_socket" in self._database_config:
+            command.append(self._database_config["unix_socket"])
+        else:
+            command.append(self._database_config["host"])
+            command.append(self._database_config["port"])
+
         # Run continuous writes in the background
-        proc = subprocess.Popen(
-            [
-                "/usr/bin/python3",
-                "src/continuous_writes.py",
-                self._database_config["user"],
-                self._database_config["password"],
-                self._database_config.get("host", self._database_config["unix_socket"]),
-                self._database_config["port"],
-                self._database_config["database"],
-                CONTINUOUS_WRITE_TABLE_NAME,
-                str(starting_number),
-            ]
-        )
+        proc = subprocess.Popen(command)
 
         # Store the continuous writes process id in stored state to be able to stop it later
         self.unit_peer_data[PROC_PID_KEY] = str(proc.pid)
@@ -270,6 +274,9 @@ class MySQLTestApplication(CharmBase):
 
     def _on_database_created(self, _) -> None:
         """Handle the database created event."""
+        if not self._database_config:
+            return
+
         self._start_continuous_writes(1)
         value = self._write_random_value()
         if self.unit.is_leader():

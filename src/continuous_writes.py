@@ -51,7 +51,12 @@ def continuous_writes(database_config: Dict, table_name: str, starting_number: i
 
 def main():
     """Run the continuous writes script."""
-    [_, username, password, host, port, database, table_name, starting_number] = sys.argv
+    if len(sys.argv) == 8:
+        [_, username, password, database, table_name, starting_number, host, port] = sys.argv
+        socket = None
+    else:
+        [_, username, password, database, table_name, starting_number, socket] = sys.argv
+
     database_config = {
         "user": username,
         "password": password,
@@ -59,11 +64,11 @@ def main():
         "use_pure": True,
         "connection_timeout": 5,
     }
-    if port == "socket":
-        database_config["unix_socket"] = host
+    if socket:
+        database_config["unix_socket"] = socket
     else:
-        database_config["port"] = port
         database_config["host"] = host
+        database_config["port"] = port
 
     continuous_writes(database_config, table_name, int(starting_number))
 
