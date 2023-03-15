@@ -23,3 +23,7 @@ get-session-ssl-cipher:
         - "disabled"
       description: Use ssl for connection
       default: enabled
+
+get-server-certificate:
+  description: Retrieve server certificate in pem format
+
