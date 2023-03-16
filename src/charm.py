@@ -328,27 +328,30 @@ class MySQLTestApplication(CharmBase):
         """Get the server certificate."""
         certificate = "error"
         if not self._database_config:
-            return event.set_results({"certificate": certificate})
-        try:
-            process = subprocess.run(
-                [
-                    "openssl",
-                    "s_client",
-                    "-starttls",
-                    "mysql",
-                    "-connect",
-                    f"{self._database_config['host']}:{self._database_config['port']}",
-                ],
-                capture_output=True,
-            )
-            # butchered stdout due non utf chars after the certificate
-            raw_output = process.stdout[:2800].decode("utf8")
-            matches = re.search(
-                r"^(-----BEGIN C.*END CERTIFICATE-----[,\s])", raw_output, re.MULTILINE | re.DOTALL
-            )
-            certificate = matches.group(0)
-        except Exception:
-            pass
+            event.fail()
+        else:
+            try:
+                process = subprocess.run(
+                    [
+                        "openssl",
+                        "s_client",
+                        "-starttls",
+                        "mysql",
+                        "-connect",
+                        f"{self._database_config['host']}:{self._database_config['port']}",
+                    ],
+                    capture_output=True,
+                )
+                # butchered stdout due non utf chars after the certificate
+                raw_output = process.stdout[:2800].decode("utf8")
+                matches = re.search(
+                    r"^(-----BEGIN C.*END CERTIFICATE-----[,\s])",
+                    raw_output,
+                    re.MULTILINE | re.DOTALL,
+                )
+                certificate = matches.group(0)
+            except Exception:
+                event.fail()
 
         event.set_results({"certificate": certificate})
 
