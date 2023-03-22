@@ -22,16 +22,19 @@ from ops.model import ActiveStatus, Relation, WaitingStatus
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 from connector import MySQLConnector  # isort: skip
+from literals import (
+    CONTINUOUS_WRITE_TABLE_NAME,
+    DATABASE_NAME,
+    DATABASE_RELATION,
+    LEGACY_MYSQL_RELATION,
+    PEER,
+    PROC_PID_KEY,
+    RANDOM_VALUE_KEY,
+    RANDOM_VALUE_TABLE_NAME,
+)
+from relations.legacy_mysql import LegacyMySQL
 
 logger = logging.getLogger(__name__)
-
-CONTINUOUS_WRITE_TABLE_NAME = "data"
-DATABASE_NAME = "continuous_writes_database"
-DATABASE_RELATION = "database"
-PEER = "application-peers"
-PROC_PID_KEY = "proc-pid"
-RANDOM_VALUE_KEY = "inserted_value"
-RANDOM_VALUE_TABLE_NAME = "random_data"
 
 
 class MySQLTestApplication(CharmBase):
@@ -79,6 +82,11 @@ class MySQLTestApplication(CharmBase):
         self.framework.observe(
             self.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
         )
+        self.framework.observe(
+            self.on[LEGACY_MYSQL_RELATION].relation_broken, self._on_relation_broken
+        )
+        # Legacy MySQL/MariaDB Handler
+        self.legacy_mysql = LegacyMySQL(self)
 
     # ==============
     # Properties
@@ -108,13 +116,22 @@ class MySQLTestApplication(CharmBase):
     @property
     def _database_config(self):
         """Returns the database config to use to connect to the MySQL cluster."""
-        data = list(self.database.fetch_relation_data().values())[0]
+        # identify the database relation
+        if self.model.get_relation(DATABASE_RELATION):
+            data = list(self.database.fetch_relation_data().values())[0]
 
-        username, password, endpoints = (
-            data.get("username"),
-            data.get("password"),
-            data.get("endpoints"),
-        )
+            username, password, endpoints = (
+                data.get("username"),
+                data.get("password"),
+                data.get("endpoints"),
+            )
+        elif self.model.get_relation(LEGACY_MYSQL_RELATION):
+            username = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-user")
+            password = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-password")
+            endpoints = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-host")
+            endpoints = f"{endpoints}:3306"
+        else:
+            return {}
         if None in [username, password, endpoints]:
             return {}
 
