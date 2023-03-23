@@ -27,3 +27,5 @@ get-session-ssl-cipher:
 get-server-certificate:
   description: Retrieve server certificate in pem format
 
+get-legacy-mysql-credentials:
+  description: Get the credentials for the legacy mysql user

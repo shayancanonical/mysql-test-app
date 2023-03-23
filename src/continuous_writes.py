@@ -22,7 +22,12 @@ def continuous_writes(database_config: Dict, table_name: str, starting_number: i
     try:
         with MySQLConnector(database_config) as cursor:
             cursor.execute(
-                f"CREATE TABLE IF NOT EXISTS `{table_name}`(number INTEGER, PRIMARY KEY(number));"
+                (
+                    f"CREATE TABLE IF NOT EXISTS `{table_name}`("
+                    "id INTEGER NOT NULL AUTO_INCREMENT,"
+                    "number INTEGER, "
+                    "PRIMARY KEY(id));"
+                )
             )
     except Exception:
         pass

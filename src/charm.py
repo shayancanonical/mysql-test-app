@@ -22,16 +22,19 @@ from ops.model import ActiveStatus, Relation, WaitingStatus
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 from connector import MySQLConnector  # isort: skip
+from literals import (
+    CONTINUOUS_WRITE_TABLE_NAME,
+    DATABASE_NAME,
+    DATABASE_RELATION,
+    LEGACY_MYSQL_RELATION,
+    PEER,
+    PROC_PID_KEY,
+    RANDOM_VALUE_KEY,
+    RANDOM_VALUE_TABLE_NAME,
+)
+from relations.legacy_mysql import LegacyMySQL
 
 logger = logging.getLogger(__name__)
-
-CONTINUOUS_WRITE_TABLE_NAME = "data"
-DATABASE_NAME = "continuous_writes_database"
-DATABASE_RELATION = "database"
-PEER = "application-peers"
-PROC_PID_KEY = "proc-pid"
-RANDOM_VALUE_KEY = "inserted_value"
-RANDOM_VALUE_TABLE_NAME = "random_data"
 
 
 class MySQLTestApplication(CharmBase):
@@ -42,7 +45,9 @@ class MySQLTestApplication(CharmBase):
 
         # Charm events
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
 
+        # Action handlers
         self.framework.observe(
             getattr(self.on, "clear_continuous_writes_action"),
             self._on_clear_continuous_writes_action,
@@ -79,6 +84,11 @@ class MySQLTestApplication(CharmBase):
         self.framework.observe(
             self.on[DATABASE_RELATION].relation_broken, self._on_relation_broken
         )
+        self.framework.observe(
+            self.on[LEGACY_MYSQL_RELATION].relation_broken, self._on_relation_broken
+        )
+        # Legacy MySQL/MariaDB Handler
+        self.legacy_mysql = LegacyMySQL(self)
 
     # ==============
     # Properties
@@ -108,13 +118,22 @@ class MySQLTestApplication(CharmBase):
     @property
     def _database_config(self):
         """Returns the database config to use to connect to the MySQL cluster."""
-        data = list(self.database.fetch_relation_data().values())[0]
+        # identify the database relation
+        if self.model.get_relation(DATABASE_RELATION):
+            data = list(self.database.fetch_relation_data().values())[0]
 
-        username, password, endpoints = (
-            data.get("username"),
-            data.get("password"),
-            data.get("endpoints"),
-        )
+            username, password, endpoints = (
+                data.get("username"),
+                data.get("password"),
+                data.get("endpoints"),
+            )
+        elif self.model.get_relation(LEGACY_MYSQL_RELATION):
+            username = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-user")
+            password = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-password")
+            endpoints = self.app_peer_data.get(f"{LEGACY_MYSQL_RELATION}-host")
+            endpoints = f"{endpoints}:3306"
+        else:
+            return {}
         if None in [username, password, endpoints]:
             return {}
 
@@ -168,9 +187,6 @@ class MySQLTestApplication(CharmBase):
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stop continuous writes to the MySQL cluster and return the last written value."""
-        if not self._database_config:
-            return None
-
         if not self.unit_peer_data.get(PROC_PID_KEY):
             return None
 
@@ -193,7 +209,7 @@ class MySQLTestApplication(CharmBase):
         return last_written_value
 
     def _max_written_value(self) -> int:
-        """Return the count of rows in the continuous writes table."""
+        """Return the max value in the continuous writes table."""
         if not self._database_config:
             return -1
 
@@ -203,7 +219,7 @@ class MySQLTestApplication(CharmBase):
             )
             return cursor.fetchone()[0]
 
-    def _create_test_table(self, cursor) -> None:
+    def _create_random_value_table(self, cursor) -> None:
         """Create a test table in the database."""
         cursor.execute(
             (
@@ -214,7 +230,7 @@ class MySQLTestApplication(CharmBase):
             )
         )
 
-    def _insert_test_data(self, cursor, random_value: str) -> None:
+    def _insert_random_value(self, cursor, random_value: str) -> None:
         """Insert the provided random value into the test table in the database."""
         cursor.execute(f"INSERT INTO `{RANDOM_VALUE_TABLE_NAME}`(data) VALUES('{random_value}')")
 
@@ -232,9 +248,9 @@ class MySQLTestApplication(CharmBase):
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
                 with attempt:
                     with MySQLConnector(self._database_config) as cursor:
-                        self._create_test_table(cursor)
+                        self._create_random_value_table(cursor)
                         random_value = self._generate_random_values(10)
-                        self._insert_test_data(cursor, random_value)
+                        self._insert_random_value(cursor, random_value)
         except RetryError:
             logger.exception("Unable to write to the database")
             return random_value
@@ -248,8 +264,11 @@ class MySQLTestApplication(CharmBase):
     # ==============
     def _on_start(self, _) -> None:
         """Handle the start event."""
-        self.unit.set_workload_version("0.0.1")
-        self.unit.status = WaitingStatus()
+        self.unit.set_workload_version("0.0.2")
+        if self._database_config:
+            self.unit.status = ActiveStatus()
+        else:
+            self.unit.status = WaitingStatus()
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Handle the clear continuous writes action event."""
@@ -281,20 +300,32 @@ class MySQLTestApplication(CharmBase):
         """Handle the database created event."""
         if not self._database_config:
             return
-
-        self._start_continuous_writes(1)
-        value = self._write_random_value()
         if self.unit.is_leader():
-            self.app_peer_data[RANDOM_VALUE_KEY] = value
-        self.unit.status = ActiveStatus()
+            self.app_peer_data["database-start"] = "true"
 
     def _on_endpoints_changed(self, _) -> None:
         """Handle the database endpoints changed event."""
         count = self._max_written_value()
         self._start_continuous_writes(count + 1)
 
+    def _on_peer_relation_changed(self, _) -> None:
+        """Handle common post database estabilshed tasks."""
+        if self.app_peer_data.get("database-start") == "true":
+            self._start_continuous_writes(1)
+
+            if self.unit.is_leader():
+                value = self._write_random_value()
+                self.app_peer_data[RANDOM_VALUE_KEY] = value
+                # flag should be picked up just once
+                self.app_peer_data["database-start"] = "done"
+
+            self.unit.status = ActiveStatus()
+
     def _on_relation_broken(self, _) -> None:
         """Handle the database relation broken event."""
+        self._stop_continuous_writes()
+        if self.unit.is_leader():
+            self.app_peer_data.pop("database-start", None)
         self.unit.status = WaitingStatus()
 
     def _get_inserted_data(self, event: ActionEvent) -> None:
