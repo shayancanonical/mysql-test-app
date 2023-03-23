@@ -7,7 +7,7 @@ import logging
 
 from literals import DATABASE_NAME, LEGACY_MYSQL_RELATION
 from ops.framework import Object
-from ops.model import ActiveStatus, BlockedStatus
+from ops.model import BlockedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,9 @@ class LegacyMySQL(Object):
         )
         self.framework.observe(
             charm.on[LEGACY_MYSQL_RELATION].relation_broken, self._on_relation_broken
+        )
+        self.framework.observe(
+            charm.on.get_legacy_mysql_credentials_action, self._get_legacy_mysql_credentials
         )
 
     def _on_relation_joined(self, event):
@@ -71,3 +74,14 @@ class LegacyMySQL(Object):
         self.charm.app_peer_data.pop(f"{LEGACY_MYSQL_RELATION}-password", None)
         self.charm.app_peer_data.pop(f"{LEGACY_MYSQL_RELATION}-host", None)
         self.charm.app_peer_data.pop(f"{LEGACY_MYSQL_RELATION}-database", None)
+
+    def _get_legacy_mysql_credentials(self, event) -> None:
+        """Retrieve legacy mariadb credentials."""
+        event.set_results(
+            {
+                "username": self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-user"],
+                "password": self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-password"],
+                "host": self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-host"],
+                "database": self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-database"],
+            }
+        )
