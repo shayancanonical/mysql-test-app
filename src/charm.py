@@ -265,8 +265,11 @@ class MySQLTestApplication(CharmBase):
     # ==============
     def _on_start(self, _) -> None:
         """Handle the start event."""
-        self.unit.set_workload_version("0.0.1")
-        self.unit.status = WaitingStatus()
+        self.unit.set_workload_version("0.0.2")
+        if self._database_config:
+            self.unit.status = ActiveStatus()
+        else:
+            self.unit.status = WaitingStatus()
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Handle the clear continuous writes action event."""
