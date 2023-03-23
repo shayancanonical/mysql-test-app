@@ -1,26 +1,35 @@
-<!--
-Avoid using this README file for information that is maintained or published elsewhere, e.g.:
+# MySQL Test Application
 
-* metadata.yaml > published on Charmhub
-* documentation > published on (or linked to from) Charmhub
-* detailed contribution guide > documentation or CONTRIBUTING.md
+MySQL stack tester charm - this is a simple application used exclusively for integrations test of
+[mysql-k8s][mysql-k8s], [mysql][mysql], [mysql-router-k8s][mysql-router-k8s],
+[mysql-router][mysql-router], [mysql-bundle-k8s][mysql-bundle-k8s] and
+[mysql-bundle][mysql-bundle].
 
-Use links instead.
--->
+## Relations
 
-# mysql-test-app
+This charm implements relations interfaces:
+* database
+* mysql (legacy)
 
-Charmhub package name: operator-template
-More information: https://charmhub.io/mysql-test-app
+On using the `mysql` legacy relation interface with either [mysql] or [mysql-k8s] charms, its
+necessary to config the database name with:
 
-Describe your charm in one or two sentences.
+```shell
+> juju config mysql-k8s mysql-interface-database=continuous_writes_database
+```
 
-## Other resources
+## Actions
 
-<!-- If your charm is documented somewhere else other than Charmhub, provide a link separately. -->
+Actions are listed on [actions page](https://charmhub.io/mysql-test-app/actions)
 
-- [Read more](https://example.com)
 
-- [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
+[mysql-k8s]: https://charmhub.io/mysql-k8s
+[mysql]: https://charmhub.io/mysql
+[mysql-router-k8s]: https://charmhub.io/mysql-router-k8s
+[mysql-router]: https://charmhub.io/mysql-router?channel=dpe/edge
+[mysql-bundle-k8s]: https://charmhub.io/mysql-bundle-k8s
+[mysql-bundle]: https://charmhub.io/mysql-bundle
 
-- See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
+## References
+
+* [MySQL Test App at Charmhub](https://charmhub.io/mysql-test-app)
