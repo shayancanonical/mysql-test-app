@@ -187,9 +187,6 @@ class MySQLTestApplication(CharmBase):
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stop continuous writes to the MySQL cluster and return the last written value."""
-        if not self._database_config:
-            return None
-
         if not self.unit_peer_data.get(PROC_PID_KEY):
             return None
 
