@@ -209,7 +209,7 @@ class MySQLTestApplication(CharmBase):
         return last_written_value
 
     def _max_written_value(self) -> int:
-        """Return the count of rows in the continuous writes table."""
+        """Return the max value in the continuous writes table."""
         if not self._database_config:
             return -1
 
@@ -219,7 +219,7 @@ class MySQLTestApplication(CharmBase):
             )
             return cursor.fetchone()[0]
 
-    def _create_test_table(self, cursor) -> None:
+    def _create_random_value_table(self, cursor) -> None:
         """Create a test table in the database."""
         cursor.execute(
             (
@@ -230,7 +230,7 @@ class MySQLTestApplication(CharmBase):
             )
         )
 
-    def _insert_test_data(self, cursor, random_value: str) -> None:
+    def _insert_random_value(self, cursor, random_value: str) -> None:
         """Insert the provided random value into the test table in the database."""
         cursor.execute(f"INSERT INTO `{RANDOM_VALUE_TABLE_NAME}`(data) VALUES('{random_value}')")
 
@@ -248,9 +248,9 @@ class MySQLTestApplication(CharmBase):
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
                 with attempt:
                     with MySQLConnector(self._database_config) as cursor:
-                        self._create_test_table(cursor)
+                        self._create_random_value_table(cursor)
                         random_value = self._generate_random_values(10)
-                        self._insert_test_data(cursor, random_value)
+                        self._insert_random_value(cursor, random_value)
         except RetryError:
             logger.exception("Unable to write to the database")
             return random_value
