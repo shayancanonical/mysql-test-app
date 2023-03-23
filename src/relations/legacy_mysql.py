@@ -62,9 +62,6 @@ class LegacyMySQL(Object):
         # Set database-start to true to trigger common post relation tasks
         self.charm.app_peer_data["database-start"] = "true"
 
-        # set charm status
-        self.charm.unit.status = ActiveStatus()
-
     def _on_relation_broken(self, _):
         if not self.charm.unit.is_leader():
             # only leader handles the relation data

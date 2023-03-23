@@ -302,7 +302,6 @@ class MySQLTestApplication(CharmBase):
             return
         if self.unit.is_leader():
             self.app_peer_data["database-start"] = "true"
-        self.unit.status = ActiveStatus()
 
     def _on_endpoints_changed(self, _) -> None:
         """Handle the database endpoints changed event."""
@@ -319,6 +318,8 @@ class MySQLTestApplication(CharmBase):
                 self.app_peer_data[RANDOM_VALUE_KEY] = value
                 # flag should be picked up just once
                 self.app_peer_data["database-start"] = "done"
+
+            self.unit.status = ActiveStatus()
 
     def _on_relation_broken(self, _) -> None:
         """Handle the database relation broken event."""
