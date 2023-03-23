@@ -45,7 +45,9 @@ class MySQLTestApplication(CharmBase):
 
         # Charm events
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
 
+        # Action handlers
         self.framework.observe(
             getattr(self.on, "clear_continuous_writes_action"),
             self._on_clear_continuous_writes_action,
@@ -301,11 +303,8 @@ class MySQLTestApplication(CharmBase):
         """Handle the database created event."""
         if not self._database_config:
             return
-
-        self._start_continuous_writes(1)
-        value = self._write_random_value()
         if self.unit.is_leader():
-            self.app_peer_data[RANDOM_VALUE_KEY] = value
+            self.app_peer_data["database-start"] = "true"
         self.unit.status = ActiveStatus()
 
     def _on_endpoints_changed(self, _) -> None:
@@ -313,8 +312,22 @@ class MySQLTestApplication(CharmBase):
         count = self._max_written_value()
         self._start_continuous_writes(count + 1)
 
+    def _on_peer_relation_changed(self, _) -> None:
+        """Handle common post database estabilshed tasks."""
+        if self.app_peer_data.get("database-start") == "true":
+            self._start_continuous_writes(1)
+
+            if self.unit.is_leader():
+                value = self._write_random_value()
+                self.app_peer_data[RANDOM_VALUE_KEY] = value
+                # flag should be picked up just once
+                self.app_peer_data["database-start"] = "done"
+
     def _on_relation_broken(self, _) -> None:
         """Handle the database relation broken event."""
+        self._stop_continuous_writes()
+        if self.unit.is_leader():
+            self.app_peer_data.pop("database-start", None)
         self.unit.status = WaitingStatus()
 
     def _get_inserted_data(self, event: ActionEvent) -> None:

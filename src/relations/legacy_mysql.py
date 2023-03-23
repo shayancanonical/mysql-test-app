@@ -5,10 +5,9 @@
 
 import logging
 
-from ops.model import ActiveStatus, BlockedStatus
-
 from literals import DATABASE_NAME, LEGACY_MYSQL_RELATION
 from ops.framework import Object
+from ops.model import ActiveStatus, BlockedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +43,13 @@ class LegacyMySQL(Object):
             if f"{LEGACY_MYSQL_RELATION}-user" in self.charm.app_peer_data:
                 # If user set, relation joined already handled
                 return
-            logger.debug("Relation data not ready yet")
+            logger.debug("Mysql legacy relation data not ready yet. Deferring event.")
             event.defer()
             return
 
         database_name = relation_data["database"]
         if database_name != DATABASE_NAME:
-            logger.error(f"Database must be set to {DATABASE_NAME}. Modify the test.")
+            logger.error(f"Database name must be set to `{DATABASE_NAME}`. Modify the test.")
             self.charm.unit.status = BlockedStatus("Wrong database name")
             return
 
@@ -59,6 +58,10 @@ class LegacyMySQL(Object):
         self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-password"] = relation_data["password"]
         self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-host"] = relation_data["host"]
         self.charm.app_peer_data[f"{LEGACY_MYSQL_RELATION}-database"] = database_name
+
+        # Set database-start to true to trigger common post relation tasks
+        self.charm.app_peer_data["database-start"] = "true"
+
         # set charm status
         self.charm.unit.status = ActiveStatus()
 
