@@ -73,6 +73,10 @@ class CharmState(Object):
         """Indicate whether the state is blocked."""
         return self.machine.state in ["waiting_for_database"]
 
+    @property
+    def current_state(self) -> str:
+        return self.machine.state
+
     def can_transition_to(self, state: str) -> bool:
         """Indicate whether the machine can transition to provided state."""
         if state not in self.machine.states:
@@ -90,5 +94,5 @@ class CharmState(Object):
 
     def _get_state_action(self, event):
         event.set_results({
-            "state": self.machine.state,
+            "state": self.current_state,
         })
