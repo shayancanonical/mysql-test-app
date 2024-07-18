@@ -33,6 +33,7 @@ from literals import (
     RANDOM_VALUE_TABLE_NAME,
 )
 from relations.legacy_mysql import LegacyMySQL
+from state_machine import CharmState
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,8 @@ class MySQLTestApplication(CharmBase):
         )
         # Legacy MySQL/MariaDB Handler
         self.legacy_mysql = LegacyMySQL(self)
+
+        self.state = CharmState(self)
 
     # ==============
     # Properties
@@ -308,9 +311,14 @@ class MySQLTestApplication(CharmBase):
                 f"DROP TABLE IF EXISTS `{self.database_name}`.`{CONTINUOUS_WRITE_TABLE_NAME}`;"
             )
 
-    def _on_start_continuous_writes_action(self, _) -> None:
+    def _on_start_continuous_writes_action(self, event) -> None:
         """Handle the start continuous writes action event."""
-        if not self._database_config:
+        if self.state.current_state == "writing":
+            event.fail(message="Writes already running")
+            return
+
+        if not self.state.can_transition_to("writing"):
+            event.fail(message="Cannot start continuous writes")
             return
 
         try:
@@ -319,13 +327,22 @@ class MySQLTestApplication(CharmBase):
             value = 1
 
         self._start_continuous_writes(value)
+        self.state.transition_to("writing")
 
     def _on_stop_continuous_writes_action(self, event: ActionEvent) -> None:
         """Handle the stop continuous writes action event."""
-        if not self._database_config:
-            return event.set_results({"writes": 0})
+        if self.state.current_state == "ready":
+            event.fail(message="Writes are already stopped")
+            event.set_results({"writes": 0})
+            return
+
+        if not self.state.can_transition_to("ready"):
+            event.fail(message="Cannot stop continuous writes")
+            event.set_results({"writes": 0})
+            return
 
         writes = self._stop_continuous_writes()
+        self.state.transition_to("ready")
         event.set_results({"writes": writes})
 
     def _on_database_created(self, _) -> None:
@@ -334,6 +351,7 @@ class MySQLTestApplication(CharmBase):
             return
         if self.unit.is_leader():
             self.app_peer_data["database-start"] = "true"
+        self.state.transition_to("ready")
 
     def _on_endpoints_changed(self, _) -> None:
         """Handle the database endpoints changed event."""
