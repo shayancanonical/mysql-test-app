@@ -33,6 +33,7 @@ from literals import (
     RANDOM_VALUE_TABLE_NAME,
 )
 from relations.legacy_mysql import LegacyMySQL
+from state_machine import CharmState
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,8 @@ class MySQLTestApplication(CharmBase):
         )
         # Legacy MySQL/MariaDB Handler
         self.legacy_mysql = LegacyMySQL(self)
+
+        self.state = CharmState(self)
 
     # ==============
     # Properties
@@ -319,6 +322,7 @@ class MySQLTestApplication(CharmBase):
             value = 1
 
         self._start_continuous_writes(value)
+        self.state.transition_to("writing")
 
     def _on_stop_continuous_writes_action(self, event: ActionEvent) -> None:
         """Handle the stop continuous writes action event."""
@@ -326,6 +330,7 @@ class MySQLTestApplication(CharmBase):
             return event.set_results({"writes": 0})
 
         writes = self._stop_continuous_writes()
+        self.state.transition_to("ready")
         event.set_results({"writes": writes})
 
     def _on_database_created(self, _) -> None:
@@ -334,6 +339,7 @@ class MySQLTestApplication(CharmBase):
             return
         if self.unit.is_leader():
             self.app_peer_data["database-start"] = "true"
+        self.state.transition_to("ready")
 
     def _on_endpoints_changed(self, _) -> None:
         """Handle the database endpoints changed event."""
